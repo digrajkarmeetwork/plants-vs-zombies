@@ -1,0 +1,405 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Create build directories
+        run: |
+          mkdir -p build/classes
+          mkdir -p dist
+        shell: bash
+
+      - name: Compile Java sources
+        run: |
+          javac -d build/classes -sourcepath src src/App.java src/controller/*.java src/model/*.java src/view/*.java
+        shell: bash
+
+      - name: Copy resources
+        run: |
+          cp -r resources build/classes/
+        shell: bash
+
+      - name: Create JAR file
+        run: |
+          cd build/classes
+          jar cfe ../../dist/PlantsVSZombies.jar App .
+        shell: bash
+
+      - name: Create Windows installer with jpackage
+        run: |
+          jpackage --input dist --name "Plants vs Zombies" --main-jar PlantsVSZombies.jar --main-class App --type app-image --dest output --icon resources/SunFlower.png --app-version 1.0.0 --vendor "Plants vs Zombies Team" --description "A tower defense game inspired by Plants vs Zombies" --win-console
+        shell: bash
+        continue-on-error: true
+
+      - name: Create Windows installer (without icon fallback)
+        if: failure()
+        run: |
+          jpackage --input dist --name "Plants vs Zombies" --main-jar PlantsVSZombies.jar --main-class App --type app-image --dest output --app-version 1.0.0 --vendor "Plants vs Zombies Team" --description "A tower defense game inspired by Plants vs Zombies"
+        shell: bash
+
+      - name: Copy resources to app directory
+        run: |
+          cp -r resources "output/Plants vs Zombies/"
+        shell: bash
+
+      - name: Create ZIP archive
+        run: |
+          cd output
+          7z a -tzip "../PlantsVSZombies-Windows.zip" "Plants vs Zombies"
+        shell: bash
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Delete existing latest release
+        run: |
+          gh release delete latest --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: "Plants vs Zombies - Latest Build"
+          body: |
+            ## Plants vs Zombies - Windows Release
+
+            **Build Date:** ${{ steps.date.outputs.date }}
+            **Commit:** ${{ steps.sha.outputs.short }}
+
+            ### Download Instructions
+            1. Download `PlantsVSZombies-Windows.zip`
+            2. Extract the ZIP file to any location
+            3. Run `Plants vs Zombies.exe` from the extracted folder
+
+            ### Requirements
+            - Windows 10 or later (64-bit)
+            - No Java installation required - JRE is bundled!
+
+            ### What's Included
+            - Full game with all plants and zombies
+            - Bundled Java Runtime (no external dependencies)
+            - All game resources and sprites
+          files: PlantsVSZombies-Windows.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: PlantsVSZombies-Windows.zip
+
+  deploy-pages:
+    needs: build-windows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./downloads
+
+      - name: Setup Pages directory
+        run: |
+          mkdir -p _site
+          cp -r docs/* _site/ 2>/dev/null || true
+          mkdir -p _site/downloads
+          cp downloads/*.zip _site/downloads/
+
+      - name: Get release info
+        id: release
+        run: |
+          echo "date=$(date +'%B %d, %Y')" >> $GITHUB_OUTPUT
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create index.html
+        run: |
+          cat > _site/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Plants vs Zombies - Download</title>
+              <style>
+                  * {
+                      margin: 0;
+                      padding: 0;
+                      box-sizing: border-box;
+                  }
+                  body {
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      background: linear-gradient(135deg, #1a472a 0%, #2d5016 50%, #4a7023 100%);
+                      min-height: 100vh;
+                      color: #fff;
+                  }
+                  .container {
+                      max-width: 900px;
+                      margin: 0 auto;
+                      padding: 40px 20px;
+                  }
+                  header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                  }
+                  h1 {
+                      font-size: 3.5rem;
+                      text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+                      margin-bottom: 10px;
+                      color: #ffeb3b;
+                  }
+                  .subtitle {
+                      font-size: 1.3rem;
+                      opacity: 0.9;
+                  }
+                  .download-card {
+                      background: rgba(255,255,255,0.1);
+                      backdrop-filter: blur(10px);
+                      border-radius: 20px;
+                      padding: 40px;
+                      margin-bottom: 30px;
+                      border: 1px solid rgba(255,255,255,0.2);
+                  }
+                  .download-btn {
+                      display: inline-block;
+                      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                      color: white;
+                      padding: 20px 50px;
+                      font-size: 1.4rem;
+                      border-radius: 50px;
+                      text-decoration: none;
+                      font-weight: bold;
+                      transition: all 0.3s ease;
+                      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                      margin: 20px 0;
+                  }
+                  .download-btn:hover {
+                      transform: translateY(-3px);
+                      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+                      background: linear-gradient(135deg, #5CBF60 0%, #55b059 100%);
+                  }
+                  .download-info {
+                      display: flex;
+                      justify-content: center;
+                      gap: 30px;
+                      margin-top: 20px;
+                      flex-wrap: wrap;
+                  }
+                  .info-item {
+                      text-align: center;
+                  }
+                  .info-label {
+                      font-size: 0.9rem;
+                      opacity: 0.7;
+                  }
+                  .info-value {
+                      font-size: 1.1rem;
+                      font-weight: bold;
+                  }
+                  .features {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: 20px;
+                      margin-top: 30px;
+                  }
+                  .feature {
+                      background: rgba(255,255,255,0.05);
+                      padding: 25px;
+                      border-radius: 15px;
+                      border: 1px solid rgba(255,255,255,0.1);
+                  }
+                  .feature h3 {
+                      color: #8BC34A;
+                      margin-bottom: 10px;
+                      font-size: 1.2rem;
+                  }
+                  .feature p {
+                      opacity: 0.85;
+                      line-height: 1.6;
+                  }
+                  .instructions {
+                      background: rgba(0,0,0,0.2);
+                      border-radius: 15px;
+                      padding: 30px;
+                      margin-top: 30px;
+                  }
+                  .instructions h2 {
+                      color: #8BC34A;
+                      margin-bottom: 20px;
+                  }
+                  .instructions ol {
+                      margin-left: 25px;
+                      line-height: 2;
+                  }
+                  .requirements {
+                      margin-top: 30px;
+                      padding: 20px;
+                      background: rgba(255,235,59,0.1);
+                      border-radius: 10px;
+                      border-left: 4px solid #ffeb3b;
+                  }
+                  .requirements h3 {
+                      color: #ffeb3b;
+                      margin-bottom: 10px;
+                  }
+                  footer {
+                      text-align: center;
+                      margin-top: 50px;
+                      padding-top: 30px;
+                      border-top: 1px solid rgba(255,255,255,0.1);
+                      opacity: 0.7;
+                  }
+                  footer a {
+                      color: #8BC34A;
+                  }
+                  .github-link {
+                      display: inline-flex;
+                      align-items: center;
+                      gap: 8px;
+                      color: #fff;
+                      text-decoration: none;
+                      padding: 10px 20px;
+                      background: rgba(255,255,255,0.1);
+                      border-radius: 25px;
+                      margin-top: 15px;
+                      transition: background 0.3s;
+                  }
+                  .github-link:hover {
+                      background: rgba(255,255,255,0.2);
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <header>
+                      <h1>Plants vs Zombies</h1>
+                      <p class="subtitle">A Java-based tower defense game</p>
+                  </header>
+
+                  <div class="download-card">
+                      <div style="text-align: center;">
+                          <a href="https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Windows.zip" class="download-btn">
+                              Download for Windows
+                          </a>
+                          <div class="download-info">
+                              <div class="info-item">
+                                  <div class="info-label">Platform</div>
+                                  <div class="info-value">Windows 10/11</div>
+                              </div>
+                              <div class="info-item">
+                                  <div class="info-label">Dependencies</div>
+                                  <div class="info-value">None Required</div>
+                              </div>
+                              <div class="info-item">
+                                  <div class="info-label">Version</div>
+                                  <div class="info-value">1.0.0</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="features">
+                      <div class="feature">
+                          <h3>No Installation Required</h3>
+                          <p>Java Runtime is bundled with the game. Just extract and play - no need to install Java separately!</p>
+                      </div>
+                      <div class="feature">
+                          <h3>Multiple Plant Types</h3>
+                          <p>Deploy Sunflowers, Pea Shooters, Venus Flytraps, Walnuts, and Potatoes to defend your lawn.</p>
+                      </div>
+                      <div class="feature">
+                          <h3>Various Zombie Enemies</h3>
+                          <p>Face off against Generic Zombies, Frank the Tank, and the sneaky Burrowing Bailey.</p>
+                      </div>
+                      <div class="feature">
+                          <h3>Level Editor</h3>
+                          <p>Create custom levels by choosing which zombies to include and how many to spawn.</p>
+                      </div>
+                      <div class="feature">
+                          <h3>Undo/Redo System</h3>
+                          <p>Made a mistake? Use the undo feature to reverse your last move and try again.</p>
+                      </div>
+                      <div class="feature">
+                          <h3>Save & Load</h3>
+                          <p>Save your game progress and continue playing later from where you left off.</p>
+                      </div>
+                  </div>
+
+                  <div class="instructions">
+                      <h2>How to Play</h2>
+                      <ol>
+                          <li>Download the ZIP file using the button above</li>
+                          <li>Extract the ZIP file to any folder on your computer</li>
+                          <li>Open the extracted folder and run <strong>Plants vs Zombies.exe</strong></li>
+                          <li>Click Menu → Start to begin the game</li>
+                          <li>Select a plant from the left panel, then click on a grid cell to place it</li>
+                          <li>Click "End Turn" to advance the game and let zombies move</li>
+                          <li>Defend your lawn - don't let zombies reach the left side!</li>
+                      </ol>
+                  </div>
+
+                  <div class="requirements">
+                      <h3>System Requirements</h3>
+                      <ul style="margin-left: 20px; line-height: 1.8;">
+                          <li>Windows 10 or Windows 11 (64-bit)</li>
+                          <li>No Java installation required (bundled with game)</li>
+                          <li>~150 MB disk space</li>
+                      </ul>
+                  </div>
+
+                  <footer>
+                      <p>Open source project</p>
+                      <a href="https://github.com/digrajkarmeetwork/plants-vs-zombies" class="github-link">
+                          <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
+                              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                          </svg>
+                          View on GitHub
+                      </a>
+                  </footer>
+              </div>
+          </body>
+          </html>
+          HTMLEOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

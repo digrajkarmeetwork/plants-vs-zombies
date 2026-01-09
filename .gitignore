@@ -1,6 +1,21 @@
+# Build outputs
 /bin/
+/bin1/
+/build/
+/dist/
+/output/
+/_site/
+
+# IDE files
 .classpath
 .project
+.idea/
+*.iml
+
+# Documentation
 /doc/
 /Milestone1/
-/bin1/
+
+# OS files
+.DS_Store
+Thumbs.db
