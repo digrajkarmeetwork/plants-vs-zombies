@@ -20,7 +20,7 @@ Or visit our [download page](https://digrajkarmeetwork.github.io/plants-vs-zombi
 ## How to Play
 
 1. Download and extract the ZIP file
-2. Run `Plants vs Zombies.exe`
+2. Run `PlantsVSZombies.exe`
 3. Click **Menu → Start** to begin
 4. Select a plant from the left panel
 5. Click on a grid cell to place it

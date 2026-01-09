@@ -32,7 +32,9 @@ jobs:
 
       - name: Compile Java sources
         run: |
-          javac -d build/classes -sourcepath src src/App.java src/controller/*.java src/model/*.java src/view/*.java
+          # Find all non-test Java files and compile them
+          find src -name "*.java" ! -name "*Test.java" > sources.txt
+          javac -d build/classes @sources.txt
         shell: bash
 
       - name: Copy resources
@@ -44,29 +46,34 @@ jobs:
         run: |
           cd build/classes
           jar cfe ../../dist/PlantsVSZombies.jar App .
+          cd ../..
+          echo "JAR file created:"
+          ls -la dist/
         shell: bash
 
-      - name: Create Windows installer with jpackage
+      - name: Verify JAR exists
         run: |
-          jpackage --input dist --name "Plants vs Zombies" --main-jar PlantsVSZombies.jar --main-class App --type app-image --dest output --icon resources/SunFlower.png --app-version 1.0.0 --vendor "Plants vs Zombies Team" --description "A tower defense game inspired by Plants vs Zombies" --win-console
+          if [ ! -f dist/PlantsVSZombies.jar ]; then
+            echo "ERROR: JAR file was not created!"
+            exit 1
+          fi
+          echo "JAR file verified successfully"
         shell: bash
-        continue-on-error: true
 
-      - name: Create Windows installer (without icon fallback)
-        if: failure()
+      - name: Create Windows app with jpackage
         run: |
-          jpackage --input dist --name "Plants vs Zombies" --main-jar PlantsVSZombies.jar --main-class App --type app-image --dest output --app-version 1.0.0 --vendor "Plants vs Zombies Team" --description "A tower defense game inspired by Plants vs Zombies"
+          jpackage --input dist --name "PlantsVSZombies" --main-jar PlantsVSZombies.jar --main-class App --type app-image --dest output --app-version 1.0.0 --vendor "Plants vs Zombies Team" --description "A tower defense game inspired by Plants vs Zombies"
         shell: bash
 
       - name: Copy resources to app directory
         run: |
-          cp -r resources "output/Plants vs Zombies/"
+          cp -r resources output/PlantsVSZombies/
         shell: bash
 
       - name: Create ZIP archive
         run: |
           cd output
-          7z a -tzip "../PlantsVSZombies-Windows.zip" "Plants vs Zombies"
+          7z a -tzip "../PlantsVSZombies-Windows.zip" "PlantsVSZombies"
         shell: bash
 
       - name: Get short SHA
@@ -100,7 +107,7 @@ jobs:
             ### Download Instructions
             1. Download `PlantsVSZombies-Windows.zip`
             2. Extract the ZIP file to any location
-            3. Run `Plants vs Zombies.exe` from the extracted folder
+            3. Run `PlantsVSZombies.exe` from the extracted folder
 
             ### Requirements
             - Windows 10 or later (64-bit)
@@ -367,7 +374,7 @@ jobs:
                       <ol>
                           <li>Download the ZIP file using the button above</li>
                           <li>Extract the ZIP file to any folder on your computer</li>
-                          <li>Open the extracted folder and run <strong>Plants vs Zombies.exe</strong></li>
+                          <li>Open the extracted folder and run <strong>PlantsVSZombies.exe</strong></li>
                           <li>Click Menu → Start to begin the game</li>
                           <li>Select a plant from the left panel, then click on a grid cell to place it</li>
                           <li>Click "End Turn" to advance the game and let zombies move</li>
