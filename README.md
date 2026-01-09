@@ -4,9 +4,14 @@ A Java-based tower defense game inspired by the classic Plants vs Zombies.
 
 ## Download
 
-**[Download for Windows](https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Windows.zip)** - No Java installation required!
+| Version | Description | Requirements |
+|---------|-------------|--------------|
+| **[Standalone](https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Windows.zip)** | Full game with bundled Java | Windows 10/11 |
+| **[Portable](https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Portable.zip)** | Lightweight JAR version | Java installed |
 
 Or visit our [download page](https://digrajkarmeetwork.github.io/plants-vs-zombies/) for more information.
+
+> **Antivirus Note:** The Standalone version may trigger a false positive because it's an unsigned executable. Use the Portable version if your antivirus blocks it.
 
 ## Features
 

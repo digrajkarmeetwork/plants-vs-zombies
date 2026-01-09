@@ -70,10 +70,52 @@ jobs:
           cp -r resources output/PlantsVSZombies/
         shell: bash
 
-      - name: Create ZIP archive
+      - name: Create ZIP archive for bundled version
         run: |
           cd output
           7z a -tzip "../PlantsVSZombies-Windows.zip" "PlantsVSZombies"
+        shell: bash
+
+      - name: Create portable JAR version (no antivirus issues)
+        run: |
+          mkdir -p portable
+          cp dist/PlantsVSZombies.jar portable/
+          cp -r resources portable/
+
+          # Create Windows launcher batch file
+          cat > portable/Play.bat << 'BATEOF'
+          @echo off
+          title Plants vs Zombies
+          java -jar PlantsVSZombies.jar
+          if errorlevel 1 (
+              echo.
+              echo ERROR: Java is not installed or not in PATH.
+              echo Please install Java from https://adoptium.net/
+              echo.
+              pause
+          )
+          BATEOF
+
+          # Create README for portable version
+          cat > portable/README.txt << 'READMEEOF'
+          Plants vs Zombies - Portable Version
+          =====================================
+
+          This version requires Java to be installed on your computer.
+
+          HOW TO PLAY:
+          1. Double-click "Play.bat" to start the game
+          2. Or run from command line: java -jar PlantsVSZombies.jar
+
+          JAVA INSTALLATION:
+          If you don't have Java installed, download it from:
+          https://adoptium.net/
+
+          Choose "Windows x64" and install the latest LTS version.
+          READMEEOF
+
+          cd portable
+          7z a -tzip "../PlantsVSZombies-Portable.zip" .
         shell: bash
 
       - name: Get short SHA
@@ -104,20 +146,38 @@ jobs:
             **Build Date:** ${{ steps.date.outputs.date }}
             **Commit:** ${{ steps.sha.outputs.short }}
 
-            ### Download Instructions
-            1. Download `PlantsVSZombies-Windows.zip`
-            2. Extract the ZIP file to any location
-            3. Run `PlantsVSZombies.exe` from the extracted folder
+            ### Download Options
 
-            ### Requirements
-            - Windows 10 or later (64-bit)
-            - No Java installation required - JRE is bundled!
+            | Version | File | Java Required | Antivirus Issues |
+            |---------|------|---------------|------------------|
+            | **Standalone** | `PlantsVSZombies-Windows.zip` | No (bundled) | May trigger false positive |
+            | **Portable** | `PlantsVSZombies-Portable.zip` | Yes | No issues |
+
+            ---
+
+            ### Option 1: Standalone Version (Recommended)
+            1. Download `PlantsVSZombies-Windows.zip`
+            2. Extract the ZIP file
+            3. Run `PlantsVSZombies.exe`
+
+            **Note:** Your antivirus may flag this as suspicious because it's an unsigned executable. This is a false positive - the app is safe. You may need to allow it through your antivirus.
+
+            ---
+
+            ### Option 2: Portable Version (If antivirus blocks standalone)
+            1. Download `PlantsVSZombies-Portable.zip`
+            2. Extract the ZIP file
+            3. Double-click `Play.bat` to start
+            4. Requires [Java](https://adoptium.net/) to be installed
+
+            ---
 
             ### What's Included
             - Full game with all plants and zombies
-            - Bundled Java Runtime (no external dependencies)
             - All game resources and sprites
-          files: PlantsVSZombies-Windows.zip
+          files: |
+            PlantsVSZombies-Windows.zip
+            PlantsVSZombies-Portable.zip
           draft: false
           prerelease: false
         env:
@@ -322,24 +382,40 @@ jobs:
 
                   <div class="download-card">
                       <div style="text-align: center;">
-                          <a href="https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Windows.zip" class="download-btn">
-                              Download for Windows
-                          </a>
-                          <div class="download-info">
-                              <div class="info-item">
-                                  <div class="info-label">Platform</div>
-                                  <div class="info-value">Windows 10/11</div>
+                          <h2 style="color: #8BC34A; margin-bottom: 20px;">Choose Your Download</h2>
+
+                          <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                              <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.2); padding: 25px; border-radius: 15px;">
+                                  <h3 style="color: #ffeb3b; margin-bottom: 10px;">Standalone Version</h3>
+                                  <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 15px;">No Java installation needed - everything is bundled!</p>
+                                  <a href="https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Windows.zip" class="download-btn" style="padding: 15px 30px; font-size: 1.1rem;">
+                                      Download Standalone
+                                  </a>
+                                  <p style="font-size: 0.8rem; opacity: 0.6; margin-top: 10px;">~150 MB</p>
                               </div>
-                              <div class="info-item">
-                                  <div class="info-label">Dependencies</div>
-                                  <div class="info-value">None Required</div>
-                              </div>
-                              <div class="info-item">
-                                  <div class="info-label">Version</div>
-                                  <div class="info-value">1.0.0</div>
+
+                              <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.2); padding: 25px; border-radius: 15px;">
+                                  <h3 style="color: #ffeb3b; margin-bottom: 10px;">Portable Version</h3>
+                                  <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 15px;">Lightweight JAR file - requires Java installed</p>
+                                  <a href="https://github.com/digrajkarmeetwork/plants-vs-zombies/releases/latest/download/PlantsVSZombies-Portable.zip" class="download-btn" style="padding: 15px 30px; font-size: 1.1rem; background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
+                                      Download Portable
+                                  </a>
+                                  <p style="font-size: 0.8rem; opacity: 0.6; margin-top: 10px;">~2 MB (requires Java)</p>
                               </div>
                           </div>
                       </div>
+                  </div>
+
+                  <div class="requirements" style="background: rgba(244,67,54,0.1); border-left-color: #f44336;">
+                      <h3 style="color: #f44336;">Antivirus Notice</h3>
+                      <p style="line-height: 1.8;">
+                          The <strong>Standalone version</strong> may trigger a false positive in your antivirus software because it contains an unsigned executable.
+                          This is common for small open-source projects that cannot afford code signing certificates.
+                          <br><br>
+                          <strong>If your antivirus blocks the standalone version:</strong>
+                          <br>1. Use the <strong>Portable version</strong> instead (requires Java)
+                          <br>2. Or add an exception in your antivirus for the game folder
+                      </p>
                   </div>
 
                   <div class="features">
